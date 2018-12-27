@@ -7,8 +7,7 @@ class JsonServer {
   start() {
     // Create Http Server
     const server = http.createServer((request, response) => {
-      // Not important for us. We're writing WebSocket server,
-      // not HTTP server
+      // Not important for us. We're writing WebSocket server
     });
     // Listen
     server.listen(webSocketsServerPort, () => {
@@ -16,18 +15,12 @@ class JsonServer {
     });
     // Create Websocket
     const wsServer = new webSocketServer({
-      // WebSocket server is tied to a HTTP server. WebSocket
-      // request is just an enhanced HTTP request. For more info 
-      // http://tools.ietf.org/html/rfc6455#page-6
       httpServer: server
     });
     // This callback function is called every time someone
     // tries to connect to the WebSocket server
     wsServer.on('request', (request) => {
       console.log((new Date()) + ' Connection from origin ' + request.origin + '.');
-      // accept connection - you should check 'request.origin' to
-      // make sure that client is connecting from your website
-      // (http://en.wikipedia.org/wiki/Same_origin_policy)
       const connection = request.accept('ocpp1.6', request.origin);
       // Listen to messqge
       connection.on('message', (message) => {
