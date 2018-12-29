@@ -2,6 +2,7 @@ const webSocketServer = require('websocket').server;
 const http = require('http');
 const ip = "192.168.1.169";
 const webSocketsServerPort = 8010;
+const ChargingStation = require("../../entity/ChargingStation")
 
 class JsonServer {
   start() {
@@ -20,40 +21,70 @@ class JsonServer {
     // This callback function is called every time someone
     // tries to connect to the WebSocket server
     wsServer.on('request', (request) => {
+      // Charger connected
       console.log((new Date()) + ' Connection from origin ' + request.origin + '.');
+      // Get connection
       const connection = request.accept('ocpp1.6', request.origin);
-      // Listen to messqge
-      connection.on('message', (message) => {
-        var serverMessage = message.utf8Data;
-        console.log(serverMessage);
-        // Respond to the Boot Notif
-        // Current Time
-        let date = new Date();
-
-        //send intervall
-        wsServer.on('message', function incoming(message) {
-          returnData = message;
-          bootNotification = {status: "Accepted", currentTime: date.toISOString(), "heartbeatInterval": 60}
-      
-          wsServer.send(JSON.stringify(heart_beat));
-        });
-
+      // Get the Charger ID
+      connection.chargingStationID = request.httpRequest.url.substring(1);
+      // Listen to error
+      connection.on('error', (error) => {
+        console.log(`## Error ${error}`);
       });
-      // Error
-      connection.on('error', () => {
-        if (protocols === "ocpp 1.6") {
-          return "ocpp1.6";
-          
-        } else {
-          console.log("error protocol");
+      // Listen to message
+      connection.on('message', (message) => {
+        // Get message
+        const serverMessage = message.utf8Data;
+        // Log
+        console.log(`>> Request received: ${serverMessage}`);
+        // Parse
+        const serverMessageParsed = JSON.parse(serverMessage);
+        // Get the command
+        const command = serverMessageParsed[2]; 
+        // Check Command
+        switch (command) {
+          // Boot Notification
+          case "BootNotification":
+            console.log("  Bootnotif received");
+            this.handleBootNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+            break;
+          // Heartbeat
+          case "Heartbeat":
+            console.log("  Heartbeat received");
+            break;
+          // Command Unknown
+          default:
+            console.log(`## Command unknown '${command}' for charging Station '${connection.chargingStationID}'`);
+            break;
         }
       });
       // Close
       connection.on('close', () => {
-        console.log("connexion closed");
+        console.log("Connexion closed");
       });
       
     });
+  }
+
+  handleBootNotification(chargingStationID, connection, messageID, data) {
+    // Set
+    data.chargingStationID = chargingStationID;
+    // Build Charging Station
+    const chargingStation = new ChargingStation(data);
+    // Save
+    chargingStation.save();
+    // Build Response
+    const bootNotificationResponse = {
+      status: "Accepted", 
+      currentTime: new Date().toISOString(), 
+      interval: 60
+    }
+    // Get the id of the bootnotif
+    const response = [3, messageID, bootNotificationResponse];
+    // Send
+    connection.send(JSON.stringify(response));
+    // Log
+    console.log(`<< Response sent: ${JSON.stringify(response)}`);
   }
 }
 
