@@ -103,6 +103,10 @@ class JsonServer {
     try {
       // Code Status Notif
       const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      if (!chargingStation) {
+        // Error
+        throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
+      }
       // Set Connector
       chargingStation[`connector${data.connectorId}`] = {
         "connectorId": data.connectorId,
