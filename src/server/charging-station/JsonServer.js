@@ -1,11 +1,10 @@
 const webSocketServer = require('websocket').server;
 const http = require('http');
-const ip = "192.168.1.169";
 const webSocketsServerPort = 8010;
 const ChargingStation = require("../../entity/ChargingStation")
 
 class JsonServer {
-  start() {
+  async start() {
     // Create Http Server
     const server = http.createServer((request, response) => {
       // Not important for us. We're writing WebSocket server
@@ -21,18 +20,20 @@ class JsonServer {
     // This callback function is called every time someone
     // tries to connect to the WebSocket server
     wsServer.on('request', (request) => {
+      // Get the charger ID
+      const chargingStationID = request.httpRequest.url.substring(1);
       // Charger connected
-      console.log((new Date()) + ' Connection from origin ' + request.origin + '.');
+      console.log((new Date()) + ' Connection of charger ' + chargingStationID + '.');
       // Get connection
       const connection = request.accept('ocpp1.6', request.origin);
       // Get the Charger ID
-      connection.chargingStationID = request.httpRequest.url.substring(1);
+      connection.chargingStationID = chargingStationID;
       // Listen to error
       connection.on('error', (error) => {
         console.log(`## Error ${error}`);
       });
       // Listen to message
-      connection.on('message', (message) => {
+      connection.on('message', async (message) => {
         // Get message
         const serverMessage = message.utf8Data;
         // Log
@@ -45,12 +46,12 @@ class JsonServer {
         switch (command) {
           // Boot Notification
           case "BootNotification":
-            console.log("  Bootnotif received");
-            this.handleBootNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+            console.log(">> Bootnotif received");
+            await this.handleBootNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
             break;
           // Heartbeat
           case "Heartbeat":
-            console.log("  Heartbeat received");
+            console.log(">> Heartbeat received");
             break;
           // Command Unknown
           default:
@@ -62,17 +63,16 @@ class JsonServer {
       connection.on('close', () => {
         console.log("Connexion closed");
       });
-      
     });
   }
 
-  handleBootNotification(chargingStationID, connection, messageID, data) {
+  async handleBootNotification(chargingStationID, connection, messageID, data) {
     // Set
     data.chargingStationID = chargingStationID;
     // Build Charging Station
     const chargingStation = new ChargingStation(data);
     // Save
-    chargingStation.save();
+    await chargingStation.save();
     // Build Response
     const bootNotificationResponse = {
       status: "Accepted", 
