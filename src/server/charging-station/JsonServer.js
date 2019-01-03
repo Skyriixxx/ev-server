@@ -2,6 +2,7 @@ const webSocketServer = require('websocket').server;
 const http = require('http');
 const webSocketsServerPort = 8010;
 const ChargingStation = require("../../entity/ChargingStation")
+const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class JsonServer {
   async start() {
@@ -51,7 +52,13 @@ class JsonServer {
             break;
           // Heartbeat
           case "Heartbeat":
+            // TODO: implement Heartbeat
             console.log(">> Heartbeat received");
+            break;
+          // StatusNotification
+          case "StatusNotification":
+            console.log(">> SutatusNotification received");
+            await this.handleStatusNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
             break;
           // Command Unknown
           default:
@@ -67,24 +74,54 @@ class JsonServer {
   }
 
   async handleBootNotification(chargingStationID, connection, messageID, data) {
-    // Set
-    data.chargingStationID = chargingStationID;
-    // Build Charging Station
-    const chargingStation = new ChargingStation(data);
-    // Save
-    await chargingStation.save();
-    // Build Response
-    const bootNotificationResponse = {
-      status: "Accepted", 
-      currentTime: new Date().toISOString(), 
-      interval: 60
+    try {
+      // Set
+      data.chargingStationID = chargingStationID;
+      // Build Charging Station
+      const chargingStation = new ChargingStation(data);
+      // Save
+      await chargingStation.save();
+      // Build Response
+      const bootNotificationResponse = {
+        status: "Accepted", 
+        currentTime: new Date().toISOString(), 
+        interval: 60
+      }
+      // Get the id of the bootnotif
+      const response = [3, messageID, bootNotificationResponse];
+      // Send
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      // TODO: Send error message to the charger
+      console.log(`## Error : ${error}`);
     }
-    // Get the id of the bootnotif
-    const response = [3, messageID, bootNotificationResponse];
-    // Send
-    connection.send(JSON.stringify(response));
-    // Log
-    console.log(`<< Response sent: ${JSON.stringify(response)}`);
+  }
+
+  async handleStatusNotification(chargingStationID, connection, messageID, data) {
+    try {
+      // Code Status Notif
+      const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      // Set Connector
+      chargingStation[`connector${data.connectorId}`] = {
+        "connectorId": data.connectorId,
+        "errorCode": data.errorCode,
+        "status": data.status,
+        "timestamp": data.timestamp
+      };
+      // Save
+      await chargingStation.save();
+      // Get the id of the bootnotif
+      const response = [3, messageID, {}];
+      // Send
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      // TODO: Send error message to the charger
+      console.log(`## Error : ${error}`);
+    }
   }
 }
 
