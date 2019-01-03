@@ -57,7 +57,7 @@ class JsonServer {
             break;
           // StatusNotification
           case "StatusNotification":
-            console.log(">> SutatusNotification received");
+            console.log(">> StatusNotification received");
             await this.handleStatusNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
             break;
           // Command Unknown
@@ -76,7 +76,7 @@ class JsonServer {
   async handleBootNotification(chargingStationID, connection, messageID, data) {
     try {
       // Set
-      data.chargingStationID = chargingStationID;
+      data.id = chargingStationID;
       // Build Charging Station
       const chargingStation = new ChargingStation(data);
       // Save
