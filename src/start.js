@@ -1,5 +1,6 @@
 const JsonServer = require('./server/ocpp/JsonServer');
 const DatabaseServer = require('./database/DatabaseServer');
+const RestServer = require('./server/rest/RestServer');
 
 class Bootstrap {
     static async start() {
@@ -14,7 +15,13 @@ class Bootstrap {
             // Create Json Server
             const jsonServer = new JsonServer();
             // Start
-            await jsonServer.start();    
+            await jsonServer.start();
+            
+            // Create Rest server
+            const restServer = new RestServer();
+            // Start
+            restServer.start();
+            
         } catch (error) {
             console.log(`Unexpected error at start-up : ${error}`);
         }

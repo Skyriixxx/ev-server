@@ -174,9 +174,6 @@ class JsonServer {
       connection.send(JSON.stringify(response));
     }
   }
-
-
-
 }
 
 module.exports = JsonServer;
