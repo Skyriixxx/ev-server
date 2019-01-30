@@ -18,6 +18,22 @@ class ChargingStationDB {
             return new ChargingStation(result);
         }   
     }
+
+    static async getChargingStations() {
+        const ChargingStation = require("../entity/ChargingStation");
+        // Get charger with ID
+        const results = await global.database.collection('chargingstation').find({}).toArray();
+        // Create objects
+        const chargingStations = [];
+        for (const result of results) {
+            // Create object
+            const chargingStation = new ChargingStation(result);
+            // Add
+            chargingStations.push(chargingStation);
+        }
+        // Return
+        return chargingStations;
+    }
 }
 
 module.exports = ChargingStationDB;

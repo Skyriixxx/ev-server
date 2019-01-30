@@ -1,21 +1,22 @@
 var express = require('express');
 var app = express();
+const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class RestServer {
     start() {
         console.log(`Starting Rest server...`);
         // Get the Request
-        app.use('/rest/api', (req, res) => {
+        app.use('/rest/api', async (req, res) => {
             // Check path
             switch (req.path) {
                 // Get Chargers
                 case "/GetChargingStations":
                     // Set Header
                     res.setHeader('Content-Type', 'application/json');
-                    // Get Chargers
-
+                    // Get Charging Stations
+                    const chargingStations = await ChargingStationDB.getChargingStations();
                     // Respond
-                    res.json({ a: 1 });
+                    res.json(chargingStations);
                     break;
             
                 default:
