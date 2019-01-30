@@ -1,4 +1,4 @@
-const JsonServer = require('./server/charging-station/JsonServer');
+const JsonServer = require('./server/ocpp/JsonServer');
 const DatabaseServer = require('./database/DatabaseServer');
 
 class Bootstrap {

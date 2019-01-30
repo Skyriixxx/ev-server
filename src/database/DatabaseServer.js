@@ -4,16 +4,7 @@ class DatabaseServer {
     async start() {
         console.log(`Starting Database server...`);
         // Connect to the DB
-        this._mongoDBClient = await MongoClient.connect(
-            "mongodb://localhost:27017",
-            {
-                useNewUrlParser: true,
-                poolSize: 30,
-                reconnectTries: 3,
-                reconnectInterval: 1000,
-                autoReconnect: true
-            }
-        );
+        this._mongoDBClient = await MongoClient.connect("mongodb://127.0.0.1:27017", {});
         // Get the EVDB
         this._db = this._mongoDBClient.db("evdb");
         // Ok
