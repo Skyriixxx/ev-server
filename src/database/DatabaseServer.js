@@ -2,6 +2,7 @@ const MongoClient = require('mongodb').MongoClient;
 
 class DatabaseServer {
     async start() {
+        console.log(`Starting Database server...`);
         // Connect to the DB
         this._mongoDBClient = await MongoClient.connect(
             "mongodb://localhost:27017",

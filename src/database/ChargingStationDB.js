@@ -16,7 +16,7 @@ class ChargingStationDB {
         if (result) {
             // Yes: Create the charger
             return new ChargingStation(result);
-        }
+        }   
     }
 }
 

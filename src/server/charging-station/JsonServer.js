@@ -6,6 +6,7 @@ const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class JsonServer {
   async start() {
+    console.log(`Starting Chqrging Station server...`);
     // Create Http Server
     const server = http.createServer((request, response) => {
       // Not important for us. We're writing WebSocket server
@@ -54,6 +55,7 @@ class JsonServer {
           case "Heartbeat":
             // TODO: implement Heartbeat
             console.log(">> Heartbeat received");
+            await this.handleHeartbeat(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
             break;
           // StatusNotification
           case "StatusNotification":
@@ -96,12 +98,22 @@ class JsonServer {
     } catch (error) {
       // TODO: Send error message to the charger
       console.log(`## Error : ${error}`);
+      // Build Response
+      const bootNotificationResponse = {
+        status: "Rejected", 
+        currentTime: new Date().toISOString(), 
+        interval: 60
+      }
+      // Get the id of the bootnotif
+      const response = [3, messageID, bootNotificationResponse];
+      // Send
+      connection.send(JSON.stringify(response));
     }
   }
 
   async handleStatusNotification(chargingStationID, connection, messageID, data) {
     try {
-      // Code Status Notif
+      // Get Charging Station
       const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
       if (!chargingStation) {
         // Error
@@ -125,8 +137,46 @@ class JsonServer {
     } catch (error) {
       // TODO: Send error message to the charger
       console.log(`## Error : ${error}`);
+      // Get the id of the bootnotif
+      const response = [3, messageID, {}];
+      // Send
+      connection.send(JSON.stringify(response));
     }
   }
+
+  async handleHeartbeat(chargingStationID, connection, messageID, data) {
+    try {
+      // Get Charging Station
+      const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      if (!chargingStation) {
+        // Error
+        throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
+      }
+      const currentDateTime = new Date();
+      // Code Heartbeat
+      chargingStation.heartbeat = currentDateTime;
+      // Save
+      await chargingStation.save();
+      // response of the heartbeat
+      const response = [3, messageID, {"currentTime": currentDateTime.toISOString()}];
+      // Send
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      // TODO: Send error message to the charger
+      console.log(`## Error : ${error}`);
+      // Save
+      await chargingStation.save();
+      // response of the heartbeat
+      const response = [3, messageID, {"currentTime": currentDateTime.toISOString()}];
+      // Send
+      connection.send(JSON.stringify(response));
+    }
+  }
+
+
+
 }
 
 module.exports = JsonServer;
