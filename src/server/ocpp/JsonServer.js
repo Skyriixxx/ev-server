@@ -6,7 +6,7 @@ const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class JsonServer {
   async start() {
-    console.log(`Starting Chqrging Station server...`);
+    console.log(`Starting Charging Station server...`);
     // Create Http Server
     const server = http.createServer((request, response) => {
       // Not important for us. We're writing WebSocket server
