@@ -1,4 +1,5 @@
 var express = require('express');
+var cors = require('cors');
 var app = express();
 const ChargingStationDB = require("../../database/ChargingStationDB")
 
@@ -6,6 +7,7 @@ class RestServer {
     start() {
         console.log(`Starting Rest server...`);
         // Get the Request
+        app.use(cors());
         app.use('/rest/api', async (req, res) => {
             // Check path
             switch (req.path) {
