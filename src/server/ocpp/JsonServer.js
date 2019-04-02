@@ -5,6 +5,11 @@ const ChargingStation = require("../../entity/ChargingStation")
 const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class JsonServer {
+  constructor() {
+    this.connections = {};
+    this.requests = {};
+  }
+
   async start() {
     console.log(`Starting Charging Station server...`);
     // Create Http Server
@@ -30,6 +35,8 @@ class JsonServer {
       const connection = request.accept('ocpp1.6', request.origin);
       // Get the Charger ID
       connection.chargingStationID = chargingStationID;
+      // Keep the connection
+      this.connections[chargingStationID] = connection; 
       // Listen to error
       connection.on('error', (error) => {
         console.log(`## Error ${error}`);
@@ -175,9 +182,17 @@ class JsonServer {
     }
   }
 
-  async restartChargingStation(chargerID) {
+  async restartChargingStation(chargingStationID) {
+    // Get the connection
+    const connection = this.connections[chargingStationID];
+    // Check
+    if (!connection) {
+      throw new Error(`No connection for charging station ${chargingStationID}`);
+    }
     // Creer la requete
+
     // Envoyer la requete
+  
     // Renvoyer la reponse
     return true;
   }
