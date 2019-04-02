@@ -8,6 +8,8 @@ class RestServer {
         console.log(`Starting Rest server...`);
         // Get the Request
         app.use(cors());
+        app.use(express.json());
+        app.use(express.urlencoded());
         app.use('/rest/api', async (req, res) => {
             // Check path
             switch (req.path) {
@@ -20,7 +22,20 @@ class RestServer {
                     // Respond
                     res.json(chargingStations);
                     break;
-            
+                case "/RestartChargingStation":
+                    try {
+                        // Get ChargerID
+                        const chargerIdRequest = req.body.ID;
+                        // Cqll Json Server
+                        // Call Restart
+                        res.json({success: true});
+                    } catch (error) {
+                        // Send ChargerID to the server
+                        res.json({success: false});
+                        // Display error
+                        console.log(error);                        
+                    }
+                    break;
                 default:
                     res.status(500).send(`Action not supported '${req.path}'`);
                     break;
