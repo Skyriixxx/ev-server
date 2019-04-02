@@ -174,6 +174,13 @@ class JsonServer {
       connection.send(JSON.stringify(response));
     }
   }
+
+  async restartChargingStation(chargerID) {
+    // Creer la requete
+    // Envoyer la requete
+    // Renvoyer la reponse
+    return true;
+  }
 }
 
 module.exports = JsonServer;

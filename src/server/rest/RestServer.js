@@ -4,7 +4,11 @@ var app = express();
 const ChargingStationDB = require("../../database/ChargingStationDB")
 
 class RestServer {
-    start() {
+    constructor(jsonServer) {
+        this.jsonServer = jsonServer;
+    }
+
+    async start() {
         console.log(`Starting Rest server...`);
         // Get the Request
         app.use(cors());
@@ -25,10 +29,11 @@ class RestServer {
                 case "/RestartChargingStation":
                     try {
                         // Get ChargerID
-                        const chargerIdRequest = req.body.ID;
+                        const chargerID = req.body.ID;
                         // Cqll Json Server
+                        const result = await this.jsonServer.restartChargingStation(chargerID);
                         // Call Restart
-                        res.json({success: true});
+                        res.json({success: result});
                     } catch (error) {
                         // Send ChargerID to the server
                         res.json({success: false});

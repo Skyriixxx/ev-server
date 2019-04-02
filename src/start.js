@@ -18,7 +18,7 @@ class Bootstrap {
             await jsonServer.start();
             
             // Create Rest server
-            const restServer = new RestServer();
+            const restServer = new RestServer(jsonServer);
             // Start
             restServer.start();
             
