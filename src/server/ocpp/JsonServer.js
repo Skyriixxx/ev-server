@@ -190,9 +190,14 @@ class JsonServer {
       throw new Error(`No connection for charging station ${chargingStationID}`);
     }
     // Creer la requete
-
+    const rebootChargingStationRequest = {
+      type : "Hard"
+    }
     // Envoyer la requete
-  
+    // [2, uuid(), "Reset", {type: "Hard"}];
+    const request = [2, uuid(), "Reset", rebootChargingStationRequest];
+    // Send
+    await connection.send(JSON.stringify(request));
     // Renvoyer la reponse
     return true;
   }

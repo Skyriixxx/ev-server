@@ -8,6 +8,7 @@ class ChargingStation {
         this.chargePointSerialNumber = data.chargePointSerialNumber;
         this.chargePointVendor = data.chargePointVendor;
         this.firmwareVersion = data.firmwareVersion;
+        this.heartbeat = data.heartbeat;
         if (data.hasOwnProperty("connector1")) {
             this.connector1 = data.connector1;
         }
