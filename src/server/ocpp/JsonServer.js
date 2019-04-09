@@ -230,23 +230,27 @@ class JsonServer {
       // Envoyer la requete
       // [2, uuid(), "Reset", {type: "Hard"}];
       const request = [2, uuid(), "Reset", rebootChargingStationRequest];
-      // Send
-      await connection.send(JSON.stringify(request));
-      // Log
-      console.log(`>> Message sent: ${JSON.stringify(request)}`);
-      // Keep the promise
-      this.requests[request[1]] = [resolve, reject];
-      // Timout
-      setTimeout(() => {
-        console.log("TIMEOUT");
-        // No response received?
-        if (this.requests[request[1]]) {
-          console.log("TIMEOUT SENT EXCEPTION");
-          // No reponse
-          reject(new Error(`Timeout on request: ${JSON.stringify(request)}`))
-        }
-      }, 5000);
+      // Send Request
+      await this.sendRequest(connection, request, resolve, reject);
     });
+  }
+
+  async sendRequest(connection, request, resolve, reject) {
+    const req = JSON.stringify(request);
+    // Send
+    await connection.send(req);
+    // Log
+    console.log(`>> Message sent: ${req}`);
+    // Keep the promise
+    this.requests[request[1]] = [resolve, reject];
+    // Timout
+    setTimeout(() => {
+      // No response received?
+      if (this.requests[request[1]]) {
+        // No reponse
+        reject(new Error(`Timeout on request: ${req}`))
+      }
+    }, 5000);
   }
 
 //   async startTransaction(connectionID) {
