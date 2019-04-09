@@ -3,6 +3,11 @@ const http = require('http');
 const webSocketsServerPort = 8010;
 const ChargingStation = require("../../entity/ChargingStation")
 const ChargingStationDB = require("../../database/ChargingStationDB")
+const uuid = require('uuid');
+const   Promise = require('promise');
+
+const JSON_REQUEST = 2;
+const JSON_RESPONSE = 3;
 
 class JsonServer {
   constructor() {
@@ -46,33 +51,19 @@ class JsonServer {
         // Get message
         const serverMessage = message.utf8Data;
         // Log
-        console.log(`>> Request received: ${serverMessage}`);
+        console.log(`>> Message received: ${serverMessage}`);
         // Parse
         const serverMessageParsed = JSON.parse(serverMessage);
-        // Get the command
-        const command = serverMessageParsed[2]; 
-        // Check Command
-        switch (command) {
-          // Boot Notification
-          case "BootNotification":
-            console.log(">> Bootnotif received");
-            await this.handleBootNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
-            break;
-          // Heartbeat
-          case "Heartbeat":
-            // TODO: implement Heartbeat
-            console.log(">> Heartbeat received");
-            await this.handleHeartbeat(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
-            break;
-          // StatusNotification
-          case "StatusNotification":
-            console.log(">> StatusNotification received");
-            await this.handleStatusNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
-            break;
-          // Command Unknown
-          default:
-            console.log(`## Command unknown '${command}' for charging Station '${connection.chargingStationID}'`);
-            break;
+        // Response?
+        if (serverMessageParsed[0] === JSON_RESPONSE) {
+          // Handle response
+          await this.handleJsonResponse(connection, serverMessageParsed);
+        // Request?
+        } else if (serverMessageParsed[0] === JSON_REQUEST) {
+          // Handle requests
+          await this.handleJsonRequests(connection, serverMessageParsed);
+        } else {
+          console.log(`Message is neither a request nor a response ${serverMessageParsed[0]}`);
         }
       });
       // Close
@@ -80,6 +71,34 @@ class JsonServer {
         console.log("Connexion closed");
       });
     });
+  }
+
+  async handleJsonRequests(connection, serverMessageParsed) {
+    // Get the command
+    const command = serverMessageParsed[2]; 
+    // Check Command
+    switch (command) {
+      // Boot Notification
+      case "BootNotification":
+        console.log(">> Bootnotif received");
+        await this.handleBootNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
+      // Heartbeat
+      case "Heartbeat":
+        // TODO: implement Heartbeat
+        console.log(">> Heartbeat received");
+        await this.handleHeartbeat(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
+      // StatusNotification
+      case "StatusNotification":
+        console.log(">> StatusNotification received");
+        await this.handleStatusNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
+      // Command Unknown
+      default:
+        console.log(`## Command unknown '${command}' for charging Station '${connection.chargingStationID}'`);
+        break;
+    }
   }
 
   async handleBootNotification(chargingStationID, connection, messageID, data) {
@@ -182,26 +201,78 @@ class JsonServer {
     }
   }
 
-  async restartChargingStation(chargingStationID) {
-    // Get the connection
-    const connection = this.connections[chargingStationID];
-    // Check
-    if (!connection) {
-      throw new Error(`No connection for charging station ${chargingStationID}`);
+  async handleJsonResponse(connection, serverMessageParsed) {
+    // Get the Promise's methods
+    const promiseMethods = this.requests[serverMessageParsed[1]];
+    if (!promiseMethods) {
+      console.log("Message response does not correspond to a request");      
+    } else {
+      console.log("PROMISE OK");
+      // Handle request
+      promiseMethods[0](serverMessageParsed[2]);
+      // Delete
+      delete this.requests[serverMessageParsed[1]];
     }
-    // Creer la requete
-    const rebootChargingStationRequest = {
-      type : "Hard"
-    }
-    // Envoyer la requete
-    // [2, uuid(), "Reset", {type: "Hard"}];
-    const request = [2, uuid(), "Reset", rebootChargingStationRequest];
-    // Send
-    await connection.send(JSON.stringify(request));
-    // Renvoyer la reponse
-    return true;
   }
-}
+
+  async restartChargingStation(chargingStationID) {
+    return new Promise(async (resolve, reject) => {
+      // Get the connection
+      const connection = this.connections[chargingStationID];
+      // Check
+      if (!connection) {
+        throw new Error(`No connection for charging station ${chargingStationID}`);
+      }
+      // Creer la requete
+      const rebootChargingStationRequest = {
+        type : "Hard"
+      }
+      // Envoyer la requete
+      // [2, uuid(), "Reset", {type: "Hard"}];
+      const request = [2, uuid(), "Reset", rebootChargingStationRequest];
+      // Send
+      await connection.send(JSON.stringify(request));
+      // Log
+      console.log(`>> Message sent: ${JSON.stringify(request)}`);
+      // Keep the promise
+      this.requests[request[1]] = [resolve, reject];
+      // Timout
+      setTimeout(() => {
+        console.log("TIMEOUT");
+        // No response received?
+        if (this.requests[request[1]]) {
+          console.log("TIMEOUT SENT EXCEPTION");
+          // No reponse
+          reject(new Error(`Timeout on request: ${JSON.stringify(request)}`))
+        }
+      }, 5000);
+    });
+  }
+
+//   async startTransaction(connectionID) {
+//     // Get the connection
+//     const connection = this.connections[`connector${data.connectorId}`];
+//     // Check
+//     if (!connection) {
+//       throw new Error(`No connection for connector ${data.connectorId}`);
+//     }
+//     // Creer la requete
+//     const startTransactionRequest = {
+//       connectorId: data.connectorId,
+//       idTag: 
+//       meterStart: 
+//       timestamp: new Date().toISOString() 
+//     }
+//     // Envoyer la requete
+//     // [2, uuid(), "Reset", {type: "Hard"}];
+
+//     // Send
+
+//     // Renvoyer la reponse
+//     return true;
+//   }
+ }
+
 
 module.exports = JsonServer;
 
