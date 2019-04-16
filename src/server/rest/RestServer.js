@@ -49,21 +49,28 @@ class RestServer {
                     }
                     break;
 
-                // case "/StartTransaction":
-                //     try {
-                //         // Get ChargerID
-                //         const connectorID = req.body.ID;
-                //         // Call Json Server
-                //         const result = await this.jsonServer.startTransaction(connectorID);
-                //         // Call Restart
-                //         res.json({success: result});
-                //     } catch (error) {
-                //         // Send ChargerID to the server
-                //         res.json({success: false});
-                //         // Display error
-                //         console.log(error);                        
-                //     }
-                //     break;                    
+                 case "/StartTransaction":
+                     try {
+                         // Get ChargerID
+                         const chargerID = req.body.chargerID;
+                         const connectorID = req.body.connectorID;
+                         // Call Json Server
+                         const result = await this.jsonServer.startTransaction(connectorID, chargerID);
+                         //Return Response
+                         if (result.status === "Accepted") {
+                            // Ok
+                            res.json({success: true});
+                        } else {
+                            // Ko
+                            res.json({success: false});
+                        }
+                    } catch (error) {
+                         // Send ChargerID to the server
+                        res.json({success: false});
+                         // Display error
+                         console.log(error);                        
+                     }
+                     break;                    
                 default:
                     res.status(500).send(`Action not supported '${req.path}'`);
                     break;

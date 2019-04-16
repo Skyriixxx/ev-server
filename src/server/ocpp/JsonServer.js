@@ -3,11 +3,13 @@ const http = require('http');
 const webSocketsServerPort = 8010;
 const ChargingStation = require("../../entity/ChargingStation")
 const ChargingStationDB = require("../../database/ChargingStationDB")
+const Transaction = require("../../entity/Transaction")
 const uuid = require('uuid');
-const   Promise = require('promise');
+const Promise = require('promise');
 
 const JSON_REQUEST = 2;
 const JSON_RESPONSE = 3;
+const JSON_ERROR = 4;
 
 class JsonServer {
   constructor() {
@@ -62,6 +64,11 @@ class JsonServer {
         } else if (serverMessageParsed[0] === JSON_REQUEST) {
           // Handle requests
           await this.handleJsonRequests(connection, serverMessageParsed);
+        // Error?
+        } else if (serverMessageParsed[0] === JSON_ERROR) {
+          console.log(`Error received: ${serverMessageParsed[3]}`);
+          // Delete
+          delete this.requests[serverMessageParsed[1]];
         } else {
           console.log(`Message is neither a request nor a response ${serverMessageParsed[0]}`);
         }
@@ -94,6 +101,12 @@ class JsonServer {
         console.log(">> StatusNotification received");
         await this.handleStatusNotification(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
         break;
+      // StartTransaction
+      case "StartTransaction":
+        console.log(">> StartTransaction received");
+        await this.handleStartTransaction(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
+
       // Command Unknown
       default:
         console.log(`## Command unknown '${command}' for charging Station '${connection.chargingStationID}'`);
@@ -116,7 +129,7 @@ class JsonServer {
         interval: 60
       }
       // Get the id of the bootnotif
-      const response = [3, messageID, bootNotificationResponse];
+      const response = [JSON_RESPONSE, messageID, bootNotificationResponse];
       // Send
       connection.send(JSON.stringify(response));
       // Log
@@ -131,7 +144,54 @@ class JsonServer {
         interval: 60
       }
       // Get the id of the bootnotif
-      const response = [3, messageID, bootNotificationResponse];
+      const response = [JSON_RESPONSE, messageID, bootNotificationResponse];
+      // Send
+      connection.send(JSON.stringify(response));
+    }
+  }
+
+  async handleStartTransaction(chargingStationID, connection, messageID, data) {
+    try {
+      // Get Charging Station
+      const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      if (!chargingStation) {
+        // Error
+        throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
+      }
+      // Set
+      data.id = new Date().getTime() % 2000000000;
+      data.chargingStationID = chargingStationID;
+      // Build a Transaction
+      const transaction = new Transaction(data);
+      // Save
+      await transaction.save();
+      // Set Connector
+      chargingStation[`connector${data.connectorId}`].transactionID = data.id;
+      // Save
+      await chargingStation.save();
+      // Build Response
+      const startTransactionResponse = {
+        idTagInfo: {        
+          status: "Accepted"
+        },
+        transactionId: data.id 
+      }
+      // Build Response
+      const response = [JSON_RESPONSE, messageID, startTransactionResponse];
+      // Send Response
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      console.log(`## Error : ${error}`);
+      const startTransactionResponse = {
+        idTagInfo: {        
+          status: "Rejected"
+        },
+        transactionId: data.connectorId
+      }
+      // Get the id of the bootnotif
+      const response = [JSON_RESPONSE, messageID, startTransactionResponse];
       // Send
       connection.send(JSON.stringify(response));
     }
@@ -155,7 +215,7 @@ class JsonServer {
       // Save
       await chargingStation.save();
       // Get the id of the bootnotif
-      const response = [3, messageID, {}];
+      const response = [JSON_RESPONSE, messageID, {}];
       // Send
       connection.send(JSON.stringify(response));
       // Log
@@ -164,7 +224,7 @@ class JsonServer {
       // TODO: Send error message to the charger
       console.log(`## Error : ${error}`);
       // Get the id of the bootnotif
-      const response = [3, messageID, {}];
+      const response = [JSON_RESPONSE, messageID, {}];
       // Send
       connection.send(JSON.stringify(response));
     }
@@ -184,7 +244,7 @@ class JsonServer {
       // Save
       await chargingStation.save();
       // response of the heartbeat
-      const response = [3, messageID, {"currentTime": currentDateTime.toISOString()}];
+      const response = [JSON_RESPONSE, messageID, {"currentTime": currentDateTime.toISOString()}];
       // Send
       connection.send(JSON.stringify(response));
       // Log
@@ -195,7 +255,7 @@ class JsonServer {
       // Save
       await chargingStation.save();
       // response of the heartbeat
-      const response = [3, messageID, {"currentTime": currentDateTime.toISOString()}];
+      const response = [JSON_RESPONSE, messageID, {"currentTime": currentDateTime.toISOString()}];
       // Send
       connection.send(JSON.stringify(response));
     }
@@ -207,7 +267,6 @@ class JsonServer {
     if (!promiseMethods) {
       console.log("Message response does not correspond to a request");      
     } else {
-      console.log("PROMISE OK");
       // Handle request
       promiseMethods[0](serverMessageParsed[2]);
       // Delete
@@ -218,24 +277,20 @@ class JsonServer {
   async restartChargingStation(chargingStationID) {
     return new Promise(async (resolve, reject) => {
       // Get the connection
-      const connection = this.connections[chargingStationID];
-      // Check
-      if (!connection) {
-        throw new Error(`No connection for charging station ${chargingStationID}`);
-      }
+      const connection = this._getChargingStationConnection(chargingStationID);
       // Creer la requete
       const rebootChargingStationRequest = {
         type : "Hard"
       }
       // Envoyer la requete
-      // [2, uuid(), "Reset", {type: "Hard"}];
-      const request = [2, uuid(), "Reset", rebootChargingStationRequest];
+      // [JSON_REQUEST, uuid(), "Reset", {type: "Hard"}];
+      const request = [JSON_REQUEST, uuid(), "Reset", rebootChargingStationRequest];
       // Send Request
-      await this.sendRequest(connection, request, resolve, reject);
+      await this._sendRequest(connection, request, resolve, reject);
     });
   }
 
-  async sendRequest(connection, request, resolve, reject) {
+  async _sendRequest(connection, request, resolve, reject) {
     const req = JSON.stringify(request);
     // Send
     await connection.send(req);
@@ -253,28 +308,33 @@ class JsonServer {
     }, 5000);
   }
 
-//   async startTransaction(connectionID) {
-//     // Get the connection
-//     const connection = this.connections[`connector${data.connectorId}`];
-//     // Check
-//     if (!connection) {
-//       throw new Error(`No connection for connector ${data.connectorId}`);
-//     }
-//     // Creer la requete
-//     const startTransactionRequest = {
-//       connectorId: data.connectorId,
-//       idTag: 
-//       meterStart: 
-//       timestamp: new Date().toISOString() 
-//     }
-//     // Envoyer la requete
-//     // [2, uuid(), "Reset", {type: "Hard"}];
+  _getChargingStationConnection(chargingStationID) {
+      // Get the connection
+      const connection = this.connections[chargingStationID];
+      // Check
+      if (!connection) {
+        throw new Error(`No connection for charging station ${chargingStationID}`);
+      }
+      return connection;
+  }
 
-//     // Send
-
-//     // Renvoyer la reponse
-//     return true;
-//   }
+  async startTransaction(connectorID, chargingStationID) {
+    return new Promise(async (resolve, reject) => {
+      // Get the connection
+      const connection = this._getChargingStationConnection(chargingStationID);
+      // Creer la requete
+      const startTransactionRequest = {
+        connectorId: connectorID,
+        idTag: "10ZE35RT67" 
+      }
+      // Envoyer la requete
+      // [JSON_REQUEST, uuid(), "Reset", {type: "Hard"}];
+      const request = [JSON_REQUEST, uuid(), "RemoteStartTransaction", startTransactionRequest];
+      
+      // Send Request
+      await this._sendRequest(connection, request, resolve, reject);
+    });
+  }
  }
 
 
