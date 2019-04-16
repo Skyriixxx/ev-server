@@ -106,7 +106,16 @@ class JsonServer {
         console.log(">> StartTransaction received");
         await this.handleStartTransaction(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
         break;
-
+      // MeterValues
+      case "MeterValues":
+        console.log(">> MeterValues received");
+        await this.handleMeterValues(connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
+      // StopTransaction
+      case "StopTransaction":
+        console.log(">> StopTransaction received");
+        await this.handleStopTransaction(connection, serverMessageParsed[1], serverMessageParsed[3]);
+        break;
       // Command Unknown
       default:
         console.log(`## Command unknown '${command}' for charging Station '${connection.chargingStationID}'`);
@@ -197,6 +206,38 @@ class JsonServer {
     }
   }
 
+  async handleMeterValues(connection, messageID) {
+    try {
+      // Build Response
+      const meterValuesResponse = {
+      }
+      // Build Response
+      const response = [JSON_RESPONSE, messageID, meterValuesResponse];
+      // Send Response
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Meter Value Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      console.log(`## Error : ${error}`);
+    }
+  }
+
+  async handleStopTransaction(connection, messageID) {
+    try {
+      // Build Response
+      const stopTransactionResponse = {
+      }
+      // Build Response
+      const response = [JSON_RESPONSE, messageID, stopTransactionResponse];
+      // Send Response
+      connection.send(JSON.stringify(response));
+      // Log
+      console.log(`<< Stop Transaction Response sent: ${JSON.stringify(response)}`);
+    } catch (error) {
+      console.log(`## Error : ${error}`);
+    }
+  }
+
   async handleStatusNotification(chargingStationID, connection, messageID, data) {
     try {
       // Get Charging Station
@@ -210,8 +251,10 @@ class JsonServer {
         "connectorId": data.connectorId,
         "errorCode": data.errorCode,
         "status": data.status,
-        "timestamp": data.timestamp
+        "timestamp": data.timestamp,
+        "transactionID": chargingStation[`connector${data.connectorId}`].transactionID
       };
+
       // Save
       await chargingStation.save();
       // Get the id of the bootnotif

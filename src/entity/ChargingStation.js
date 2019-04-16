@@ -16,7 +16,6 @@ class ChargingStation {
         if (data.hasOwnProperty("connector2")) {
             this.connector2 = data.connector2;
         }
-
     }
 
     async save() {
