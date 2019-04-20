@@ -114,7 +114,7 @@ class JsonServer {
       // StopTransaction
       case "StopTransaction":
         console.log(">> StopTransaction received");
-        await this.handleStopTransaction(connection, serverMessageParsed[1], serverMessageParsed[3]);
+        await this.handleStopTransaction(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
         break;
       // Command Unknown
       default:
@@ -222,8 +222,20 @@ class JsonServer {
     }
   }
 
-  async handleStopTransaction(connection, messageID) {
+  async handleStopTransaction(chargingStationID, connection, messageID, data) {
     try {
+      // Get Charging Station
+      const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      if (!chargingStation) {
+        // Error
+        throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
+      }
+      if (chargingStation.connector1.transactionID === data.transactionId) {
+        delete chargingStation.connector1.transactionID;
+      } else if(chargingStation.connector2.transactionID === data.transactionId) {
+        delete chargingStation.connector2.transactionID;
+      }
+      await chargingStation.save();
       // Build Response
       const stopTransactionResponse = {
       }
@@ -317,7 +329,7 @@ class JsonServer {
     }
   }
 
-  async restartChargingStation(chargingStationID) {
+  async requestRestartChargingStation(chargingStationID) {
     return new Promise(async (resolve, reject) => {
       // Get the connection
       const connection = this._getChargingStationConnection(chargingStationID);
@@ -361,7 +373,7 @@ class JsonServer {
       return connection;
   }
 
-  async startTransaction(connectorID, chargingStationID) {
+  async requestRemoteStartTransaction(connectorID, chargingStationID) {
     return new Promise(async (resolve, reject) => {
       // Get the connection
       const connection = this._getChargingStationConnection(chargingStationID);
@@ -373,6 +385,21 @@ class JsonServer {
       // Envoyer la requete
       // [JSON_REQUEST, uuid(), "Reset", {type: "Hard"}];
       const request = [JSON_REQUEST, uuid(), "RemoteStartTransaction", startTransactionRequest];
+      
+      // Send Request
+      await this._sendRequest(connection, request, resolve, reject);
+    });
+  }
+
+  async requestRemoteStopTransaction(transactionID) {
+    return new Promise(async (resolve, reject) => {
+      // Creer la requete
+      const stopTransactionRequest = {
+        transactionId: transactionID,
+      }
+      // Envoyer la requete
+      // [JSON_REQUEST, uuid(), "Reset", {type: "Hard"}];
+      const request = [JSON_REQUEST, uuid(), "RemoteStopTransaction", stopTransactionRequest];
       
       // Send Request
       await this._sendRequest(connection, request, resolve, reject);
