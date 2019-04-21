@@ -4,6 +4,7 @@ const webSocketsServerPort = 8010;
 const ChargingStation = require("../../entity/ChargingStation")
 const ChargingStationDB = require("../../database/ChargingStationDB")
 const Transaction = require("../../entity/Transaction")
+const TransactionDB = require("../../database/TransactionDB")
 const uuid = require('uuid');
 const Promise = require('promise');
 
@@ -224,10 +225,14 @@ class JsonServer {
 
   async handleStopTransaction(chargingStationID, connection, messageID, data) {
     try {
+      // Get Transaction DB
+      const transaction = await TransactionDB.getTransaction(data.transactionId);
+      if (!transaction) {
+        throw new Error(`Transaction ID ${data.transactionId} does not exist!`);  
+      }
       // Get Charging Station
       const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
       if (!chargingStation) {
-        // Error
         throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
       }
       if (chargingStation.connector1.transactionID === data.transactionId) {
@@ -236,8 +241,18 @@ class JsonServer {
         delete chargingStation.connector2.transactionID;
       }
       await chargingStation.save();
+      // Set meterStop
+      transaction.stop = {
+        "meterStop": data.meterStop,
+        "timestamp": data.timestamp
+      };
+      await transaction.save();
+
       // Build Response
       const stopTransactionResponse = {
+        idTagInfo: {
+          status: "Accepted"
+        }
       }
       // Build Response
       const response = [JSON_RESPONSE, messageID, stopTransactionResponse];
@@ -391,8 +406,10 @@ class JsonServer {
     });
   }
 
-  async requestRemoteStopTransaction(transactionID) {
+  async requestRemoteStopTransaction(transactionID, chargingStationID) {
     return new Promise(async (resolve, reject) => {
+      // Get the connection
+      const connection = this._getChargingStationConnection(chargingStationID);
       // Creer la requete
       const stopTransactionRequest = {
         transactionId: transactionID,

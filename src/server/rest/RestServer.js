@@ -74,8 +74,9 @@ class RestServer {
                      case "/StopTransaction":
                      try {
                          const transactionID = req.body.transactionID;
+                         const chargerID = req.body.chargerID;
                          // Call Json Server
-                         const result = await this.jsonServer.requestRemoteStopTransaction(transactionID);
+                         const result = await this.jsonServer.requestRemoteStopTransaction(transactionID, chargerID);
                          //Return Response
                          if (result.status === "Accepted") {
                             // Ok
