@@ -12,7 +12,6 @@ class ChargingStation {
         if (data.hasOwnProperty("connector1")) {
             this.connector1 = data.connector1;
         }
-
         if (data.hasOwnProperty("connector2")) {
             this.connector2 = data.connector2;
         }

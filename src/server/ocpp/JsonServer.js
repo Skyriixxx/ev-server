@@ -5,8 +5,10 @@ const ChargingStation = require("../../entity/ChargingStation")
 const ChargingStationDB = require("../../database/ChargingStationDB")
 const Transaction = require("../../entity/Transaction")
 const TransactionDB = require("../../database/TransactionDB")
+const Consumption = require("../../entity/Consumption")
 const uuid = require('uuid');
 const Promise = require('promise');
+const moment = require('moment');
 
 const JSON_REQUEST = 2;
 const JSON_RESPONSE = 3;
@@ -110,7 +112,7 @@ class JsonServer {
       // MeterValues
       case "MeterValues":
         console.log(">> MeterValues received");
-        await this.handleMeterValues(connection, serverMessageParsed[1], serverMessageParsed[3]);
+        await this.handleMeterValues(connection.chargingStationID, connection, serverMessageParsed[1], serverMessageParsed[3]);
         break;
       // StopTransaction
       case "StopTransaction":
@@ -165,13 +167,12 @@ class JsonServer {
       // Get Charging Station
       const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
       if (!chargingStation) {
-        // Error
         throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
       }
-
       // Set
       data.id = new Date().getTime() % 2000000000;
       data.chargingStationID = chargingStationID;
+      data.totalConsumptionWh = 0
       data.lastMeterValue = {
         "meterValue": data.meterStart,
         "timestamp": data.timestamp
@@ -182,6 +183,8 @@ class JsonServer {
       await transaction.save();
       // Set Connector
       chargingStation[`connector${data.connectorId}`].transactionID = data.id;
+      chargingStation[`connector${data.connectorId}`].totalConsumptionWh = 0;
+      chargingStation[`connector${data.connectorId}`].instantPowerWatt = 0;
       // Save
       await chargingStation.save();
       // Build Response
@@ -212,21 +215,54 @@ class JsonServer {
     }
   }
 
-  async handleMeterValues(connection, messageID, data) {
+  async handleMeterValues(chargingStationID, connection, messageID, data) {
     try {
+      // Get Charging Station
+      const chargingStation = await ChargingStationDB.getChargingStation(chargingStationID);
+      if (!chargingStation) {
+        throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
+      }
       // Get Transaction DB
       const transaction = await TransactionDB.getTransaction(data.transactionId);
+      if (!transaction) {
+        throw new Error(`Transaction ID ${data.transactionId} does not exist!`);  
+      }
       // Build Response
       const meterValuesResponse = {
       }
-      // Compute consumption with last meter value
-
-      // Update last meter value
-      transaction.lastMeterValue = {
-        "meterValue": data.meterValue[0].sampledValue[0].value,
-        "timestamp": data.meterValue[0].timestamp
-      };
+      // Compute consumption
+      for (const meterValue of data.meterValue) {
+        for (const sampledValue of meterValue.sampledValue) {
+          // Compute consumption with last meter value
+          const consumptionWh = sampledValue.value - transaction.lastMeterValue.meterValue;
+          const totalConsumptionWh = transaction.totalConsumptionWh + consumptionWh;
+          const diffTimestampSecs = moment(data.timestamp).diff(moment(transaction.lastMeterValue.timestamp), "s");
+          const consumption = new Consumption({
+            "id": uuid(),
+            "transactionId": data.transactionId,
+            "timestampBegin": transaction.lastMeterValue.timestamp,
+            "timestampEnd": meterValue.timestamp,
+            consumptionWh,
+            totalConsumptionWh, 
+            "instantPowerWatt": consumptionWh * diffTimestampSecs
+          });
+          // Save
+          await consumption.save();
+          // Update last meter value
+          transaction.lastMeterValue = {
+            "meterValue": sampledValue.value,
+            "timestamp": meterValue.timestamp
+          };
+          transaction.totalConsumptionWh = totalConsumptionWh;
+          // Set Conso
+          chargingStation[`connector${transaction.connectorId}`].totalConsumptionWh = consumption.totalConsumptionWh;
+          chargingStation[`connector${transaction.connectorId}`].instantPowerWatt = consumption.instantPowerWatt;
+        }
+      }
+      // Save
       await transaction.save();
+      // Save
+      await chargingStation.save();
       // Build Response
       const response = [JSON_RESPONSE, messageID, meterValuesResponse];
       // Send Response
@@ -252,17 +288,37 @@ class JsonServer {
       }
       if (chargingStation.connector1.transactionID === data.transactionId) {
         delete chargingStation.connector1.transactionID;
+        delete chargingStation.connector1.totalConsumptionWh;
+        delete chargingStation.connector1.instantPowerWatt;
       } else if(chargingStation.connector2.transactionID === data.transactionId) {
         delete chargingStation.connector2.transactionID;
+        delete chargingStation.connector2.totalConsumptionWh;
+        delete chargingStation.connector2.instantPowerWatt;
       }
       await chargingStation.save();
       // Compute last consumption
+      const consumptionWh = data.meterStop - transaction.lastMeterValue.meterValue;
+      const totalConsumptionWh = transaction.totalConsumptionWh + consumptionWh;
+      const diffTimestampSecs = moment(data.timestamp).diff(moment(transaction.lastMeterValue.timestamp), "s");
+      const consumption = new Consumption({
+        "id": uuid(),
+        "transactionId": data.transactionId,
+        "timestampBegin": transaction.lastMeterValue.timestamp,
+        "timestampEnd": data.timestamp,
+        consumptionWh,
+        totalConsumptionWh, 
+        "instantPowerWatt": consumptionWh * diffTimestampSecs
+      });
+      // Save
+      await consumption.save();
       // Remove last meter value
       delete transaction.lastMeterValue;
+      delete transaction.totalConsumptionWh;
       // Set meterStop
       transaction.stop = {
         "meterStop": data.meterStop,
-        "timestamp": data.timestamp
+        "timestamp": data.timestamp,
+        "totalConsumptionWh": totalConsumptionWh
       };
       await transaction.save();
       // Build Response

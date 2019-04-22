@@ -10,6 +10,9 @@ class Transaction {
         if (data.hasOwnProperty("lastMeterValue")) {
             this.lastMeterValue = data.lastMeterValue;
         }
+        if (data.hasOwnProperty("totalConsumptionWh")) {
+            this.totalConsumptionWh = data.totalConsumptionWh;
+        }
     }
     
     async save() {
