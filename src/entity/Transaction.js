@@ -7,6 +7,9 @@ class Transaction {
         this.idTag = data.idTag;
         this.meterStart = data.meterStart;
         this.timestamp = data.timestamp;
+        if (data.hasOwnProperty("lastMeterValue")) {
+            this.lastMeterValue = data.lastMeterValue;
+        }
     }
     
     async save() {

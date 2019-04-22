@@ -168,11 +168,16 @@ class JsonServer {
         // Error
         throw new Error(`Charging Station ${chargingStationID} does not exist!`);  
       }
+
       // Set
       data.id = new Date().getTime() % 2000000000;
       data.chargingStationID = chargingStationID;
+      data.lastMeterValue = {
+        "meterValue": data.meterStart,
+        "timestamp": data.timestamp
+      };      
       // Build a Transaction
-      const transaction = new Transaction(data);
+      const transaction = new Transaction(data);      
       // Save
       await transaction.save();
       // Set Connector
@@ -207,11 +212,21 @@ class JsonServer {
     }
   }
 
-  async handleMeterValues(connection, messageID) {
+  async handleMeterValues(connection, messageID, data) {
     try {
+      // Get Transaction DB
+      const transaction = await TransactionDB.getTransaction(data.transactionId);
       // Build Response
       const meterValuesResponse = {
       }
+      // Compute consumption with last meter value
+
+      // Update last meter value
+      transaction.lastMeterValue = {
+        "meterValue": data.meterValue[0].sampledValue[0].value,
+        "timestamp": data.meterValue[0].timestamp
+      };
+      await transaction.save();
       // Build Response
       const response = [JSON_RESPONSE, messageID, meterValuesResponse];
       // Send Response
@@ -241,13 +256,15 @@ class JsonServer {
         delete chargingStation.connector2.transactionID;
       }
       await chargingStation.save();
+      // Compute last consumption
+      // Remove last meter value
+      delete transaction.lastMeterValue;
       // Set meterStop
       transaction.stop = {
         "meterStop": data.meterStop,
         "timestamp": data.timestamp
       };
       await transaction.save();
-
       // Build Response
       const stopTransactionResponse = {
         idTagInfo: {
@@ -279,7 +296,7 @@ class JsonServer {
         "errorCode": data.errorCode,
         "status": data.status,
         "timestamp": data.timestamp,
-        "transactionID": chargingStation[`connector${data.connectorId}`].transactionID
+        "transactionID": (chargingStation[`connector${data.connectorId}`] ? chargingStation[`connector${data.connectorId}`].transactionID : null)
       };
 
       // Save
@@ -315,7 +332,7 @@ class JsonServer {
       await chargingStation.save();
       // response of the heartbeat
       const response = [JSON_RESPONSE, messageID, {"currentTime": currentDateTime.toISOString()}];
-      // Send
+      // Send 
       connection.send(JSON.stringify(response));
       // Log
       console.log(`<< Response sent: ${JSON.stringify(response)}`);

@@ -2,9 +2,9 @@
 class ChargingStationDB {
     static async save(chargingStation) {
         // Save
-        await global.database.collection('chargingstation').findOneAndUpdate(
+        await global.database.collection('chargingstation').findOneAndReplace(
             { "_id": chargingStation.id }, 
-            { $set: chargingStation }, 
+            chargingStation,
             { upsert: true, new: true, returnOriginal: false });
     }
 

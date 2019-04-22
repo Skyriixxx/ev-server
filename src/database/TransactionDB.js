@@ -1,9 +1,9 @@
 class TransactionDB {
     static async save(transaction) {
         // Save
-        await global.database.collection('transaction').findOneAndUpdate(
+        await global.database.collection('transaction').findOneAndReplace(
             { "_id": transaction.id }, 
-            { $set: transaction }, 
+            transaction, 
             { upsert: true, new: true, returnOriginal: false });
     }
 
