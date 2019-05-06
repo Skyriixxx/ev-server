@@ -2,6 +2,7 @@ var express = require('express');
 var cors = require('cors');
 var app = express();
 const ChargingStationDB = require("../../database/ChargingStationDB")
+const ConsumptionDB = require("../../database/ConsumptionDB")
 
 class RestServer {
     constructor(jsonServer) {
@@ -25,13 +26,24 @@ class RestServer {
                     const chargingStations = await ChargingStationDB.getChargingStations();
                     // Respond
                     res.json(chargingStations);
+                    break;  
+
+                case "/GetConsumptions":    
+                    // Set Header
+                    res.setHeader('Content-Type', 'application/json');
+                    // Get the transation ID
+                    const transactionId = parseInt(req.query.TransactionId);
+                    // Get Consumption
+                    const consumptions = await ConsumptionDB.getConsumptions(transactionId);
+                    // Respond
+                    res.json(consumptions);
                     break;
 
                 case "/RestartChargingStation":
                     try {
                         // Get ChargerID
                         const chargerID = req.body.ID;
-                        // Cqll Json Server
+                        // Call Json Server
                         const result = await this.jsonServer.requestRestartChargingStation(chargerID);
                         // Return response
                         if (result.status === "Accepted") {
